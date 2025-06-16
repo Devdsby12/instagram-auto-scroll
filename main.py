@@ -18,7 +18,7 @@ def delay(min_sec=2, max_sec=5):
     time.sleep(random.uniform(min_sec, max_sec))
 
 def generate_caption():
-    prompt = "Write a funny, Instagram-style caption for a reel with dark humor or meme vibes in Hinglish. Include Indian city name."
+    prompt = "Write a funny, Instagram-style caption for a reel with dark humor or meme vibes in Hinglish. Include an Indian city name and trending hashtag."
     res = requests.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}",
         headers={"Content-Type": "application/json"},
@@ -36,7 +36,9 @@ def download_reel(video_url, filename):
 def run_bot():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        )
         context.add_cookies([{
             "name": "sessionid",
             "value": SESSION_ID,
@@ -51,10 +53,15 @@ def run_bot():
         for tag in TAGS:
             print(f"[🔥] Visiting #{tag}")
             page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
-            delay(8, 12)
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
+            delay(5, 8)
 
-            page.wait_for_selector("a[href*='/reel/']", timeout=20000)
-            links = page.locator("a[href*='/reel/']").all()
+            try:
+                page.wait_for_selector("a[href*='/reel/']", timeout=20000)
+                links = page.locator("a[href*='/reel/']").all()
+            except Exception as e:
+                print(f"[⚠️] No reels found on #{tag}: {e}")
+                continue
 
             if len(links) == 0:
                 print(f"[⚠️] No posts found in #{tag}, trying next...")
@@ -92,7 +99,7 @@ def run_bot():
                     print(f"[❌] Error: {str(e)}")
                     delay(3, 6)
 
-            break  # stop after first successful tag
+            break  # Stop after first successful tag
 
         context.close()
         browser.close()
