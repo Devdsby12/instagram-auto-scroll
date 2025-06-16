@@ -18,7 +18,7 @@ def delay(min_sec=2, max_sec=5):
     time.sleep(random.uniform(min_sec, max_sec))
 
 def generate_caption():
-    prompt = "Write a funny, Instagram-style caption for a reel with dark humor or meme vibes in Hinglish. Include an Indian city name and trending hashtag."
+    prompt = "Write a funny, Instagram-style caption for a reel with dark humor or meme vibes in Hinglish. Include an Indian city name."
     res = requests.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}",
         headers={"Content-Type": "application/json"},
@@ -37,8 +37,11 @@ def run_bot():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            locale="en-US",
+            viewport={"width": 1280, "height": 800}
         )
+
         context.add_cookies([{
             "name": "sessionid",
             "value": SESSION_ID,
@@ -48,13 +51,18 @@ def run_bot():
             "secure": True,
             "sameSite": "Lax"
         }])
+
         page = context.new_page()
 
         for tag in TAGS:
             print(f"[🔥] Visiting #{tag}")
             page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
-            delay(5, 8)
+            delay(8, 12)
+
+            # Scroll to load more reels
+            for _ in range(5):
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
+                delay(3, 5)
 
             try:
                 page.wait_for_selector("a[href*='/reel/']", timeout=20000)
@@ -99,10 +107,11 @@ def run_bot():
                     print(f"[❌] Error: {str(e)}")
                     delay(3, 6)
 
-            break  # Stop after first successful tag
+            break  # stop after first successful tag
 
         context.close()
         browser.close()
+
 
 if __name__ == "__main__":
     run_bot()
