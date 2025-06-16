@@ -53,9 +53,8 @@ def run_bot():
             page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
             delay(8, 12)
 
-           page.wait_for_selector("a[href*='/reel/']", timeout=20000)
-links = page.locator("a[href*='/reel/']").all()
-
+            page.wait_for_selector("a[href*='/reel/']", timeout=20000)
+            links = page.locator("a[href*='/reel/']").all()
 
             if len(links) == 0:
                 print(f"[⚠️] No posts found in #{tag}, trying next...")
@@ -71,8 +70,8 @@ links = page.locator("a[href*='/reel/']").all()
                     href = post.get_attribute("href")
                     if not href or "/reel/" not in href:
                         continue
-                   print("[DEBUG] Loading page:", f"https://www.instagram.com/explore/tags/{tag}/")
 
+                    print("[DEBUG] Loading page:", f"https://www.instagram.com{href}")
                     page.goto(f"https://www.instagram.com{href}", timeout=30000)
                     delay(5, 8)
 
@@ -97,7 +96,6 @@ links = page.locator("a[href*='/reel/']").all()
 
         context.close()
         browser.close()
-
 
 if __name__ == "__main__":
     run_bot()
