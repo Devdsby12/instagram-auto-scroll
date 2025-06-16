@@ -2,102 +2,97 @@ import os
 import time
 import random
 import requests
-from dotenv import load_dotenv
-from google import genai
 from playwright.sync_api import sync_playwright
 
-def main():
-    # Load environment variables from .env file if present
-    load_dotenv()
-    
-    # Retrieve Instagram session ID and Gemini API key from environment
-    sessionid = os.getenv("INSTAGRAM_SESSION_ID")
-    gemini_api_key = os.getenv("GEMINI_API_KEY")
-    if not sessionid or not gemini_api_key:
-        print("Error: INSTAGRAM_SESSION_ID or GEMINI_API_KEY not found in environment.")
-        return
+# Get secrets from environment (GitHub Actions secrets)
+SESSION_ID = os.getenv("INSTAGRAM_SESSION_ID")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-    # Initialize Gemini (Google GenAI SDK) client
+if not SESSION_ID or not GEMINI_API_KEY:
+    raise Exception("INSTAGRAM_SESSION_ID or GEMINI_API_KEY not found in environment.")
+
+# Hashtags to scrape
+TAGS = ["reelsinstagram", "indianfunny", "hindimemes", "comedy"]
+
+# Folder to save reels
+DOWNLOAD_DIR = "reels"
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+def delay(min_sec=2, max_sec=5):
+    time.sleep(random.uniform(min_sec, max_sec))
+
+def generate_caption():
+    prompt = "Write a funny caption for an Instagram meme reel in Hinglish with an Indian city name."
     try:
-        client = genai.Client(api_key=gemini_api_key)
-    except Exception as e:
-        print(f"Error initializing Gemini client: {e}")
-        return
-    
-    # Ensure 'reels' folder exists
-    os.makedirs("reels", exist_ok=True)
+        res = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}",
+            headers={"Content-Type": "application/json"},
+            json={"contents": [{"parts": [{"text": prompt}]}]}
+        )
+        return res.json()['candidates'][0]['content']['parts'][0]['text']
+    except:
+        return "#funny #reels"
 
-    # Launch Playwright browser
+def download_reel(video_url, filename):
+    r = requests.get(video_url, stream=True)
+    with open(filename, 'wb') as f:
+        for chunk in r.iter_content(chunk_size=1024):
+            f.write(chunk)
+
+def run_bot():
     with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context()
+        context.add_cookies([{
+            "name": "sessionid",
+            "value": SESSION_ID,
+            "domain": ".instagram.com",
+            "path": "/",
+            "httpOnly": True,
+            "secure": True,
+            "sameSite": "Lax"
+        }])
+        page = context.new_page()
+
+        print("🚀 Starting Instagram bot...")
+
         try:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context()
-            # Set Instagram session cookie for login
-            context.add_cookies([{
-                "name": "sessionid",
-                "value": sessionid,
-                "domain": ".instagram.com",
-                "path": "/",
-                "httpOnly": True,
-                "secure": True,
-                "sameSite": "Lax"
-            }])
-            page = context.new_page()
-
-            # Navigate to Instagram homepage
             page.goto("https://www.instagram.com/", timeout=60000)
-            page.reload()
-            page.wait_for_load_state("networkidle")
-            
-            # Navigate to Explore page for Reels
-            page.goto("https://www.instagram.com/explore/", timeout=60000)
-            page.wait_for_selector("video")
-
-            # Collect unique video sources
-            video_urls = set()
-            scroll_attempts = 0
-            while len(video_urls) < 5 and scroll_attempts < 5:
-                videos = page.query_selector_all("video")
-                for video in videos:
-                    src = video.get_attribute("src")
-                    if src and src not in video_urls:
-                        video_urls.add(src)
-                    if len(video_urls) >= 5:
-                        break
-                if len(video_urls) >= 5:
-                    break
-                # Scroll down to load more content
-                page.evaluate("window.scrollBy(0, document.body.scrollHeight)")
-                time.sleep(2)
-                scroll_attempts += 1
-
-            # Download each video and generate caption
-            for idx, video_url in enumerate(list(video_urls)[:5], start=1):
-                try:
-                    # Download video content
-                    headers = {"User-Agent": "Mozilla/5.0"}
-                    response = requests.get(video_url, headers=headers, timeout=60)
-                    response.raise_for_status()
-                    video_path = os.path.join("reels", f"video_{idx}.mp4")
-                    with open(video_path, "wb") as f:
-                        f.write(response.content)
-                    
-                    # Generate random city name for caption
-                    cities = ["Mumbai", "Delhi", "Bangalore", "Hyderabad", "Ahmedabad", 
-                              "Chennai", "Kolkata", "Pune", "Jaipur", "Lucknow"]
-                    city = random.choice(cities)
-                    prompt = f"Write a funny Hinglish Instagram caption that includes the name of the city {city}."
-
-                    # Generate caption using Gemini API
-                    response = client.models.generate_content(model="gemini-2.0-flash-001", contents=prompt)
-                    caption = response.text.strip()
-
-                    print(f"Downloaded Video {idx}: {video_path}")
-                    print(f"Generated Caption: {caption}\n")
-                except Exception as e:
-                    print(f"Error processing video {idx}: {e}")
+            page.wait_for_selector("nav", timeout=15000)
+            print("[✅] Logged in and homepage loaded")
         except Exception as e:
-            print(f"Error during Playwright execution: {e}")
+            print(f"[❌] Login failed: {e}")
+            return
+
+        for tag in TAGS:
+            print(f"[🔥] Visiting #{tag}")
+            try:
+                page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
+                delay(10, 15)
+
+                page.wait_for_selector("video", timeout=30000)
+                videos = page.locator("video").all()
+
+                print(f"[🎥] Found {len(videos)} videos")
+                count = 0
+                for video in videos:
+                    if count >= 5:
+                        break
+                    video_url = video.get_attribute("src")
+                    if video_url and ".mp4" in video_url:
+                        filename = f"{DOWNLOAD_DIR}/reel_{random.randint(1000,9999)}.mp4"
+                        download_reel(video_url, filename)
+                        caption = generate_caption()
+                        print(f"[✅] Saved: {filename}")
+                        print(f"[📝] Caption: {caption}")
+                        count += 1
+                        delay(2, 5)
+            except Exception as e:
+                print(f"[❌] Error with #{tag}: {e}")
+                delay(2, 4)
+
+        context.close()
+        browser.close()
 
 if __name__ == "__main__":
-    main()
+    run_bot()
