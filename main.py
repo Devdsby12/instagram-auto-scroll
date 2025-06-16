@@ -5,12 +5,11 @@ import requests
 from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 SESSION_ID = os.getenv("SESSION_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-TAGS = ["reelsinstagram", "indianfunny", "foryou", "hindimemes"]
+TAGS = ["reelsinstagram", "indianfunny", "hindimemes", "comedy"]
 DOWNLOAD_DIR = "reels"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
@@ -27,7 +26,7 @@ def generate_caption():
         )
         return res.json()['candidates'][0]['content']['parts'][0]['text']
     except:
-        return "#reels #funny"
+        return "#funny #reels"
 
 def download_reel(video_url, filename):
     r = requests.get(video_url, stream=True)
@@ -52,22 +51,18 @@ def run_bot():
 
         for tag in TAGS:
             print(f"[🔥] Visiting #{tag}")
-            page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
-            delay(8, 12)
-
             try:
-                page.wait_for_selector("video", timeout=25000)
+                page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
+                delay(10, 15)
+
+                # 👇 This is the magic fix — wait for actual <video> tags, not hrefs!
+                page.wait_for_selector("video", timeout=30000)
                 videos = page.locator("video").all()
 
-                if not videos:
-                    print(f"[⚠️] No videos found on #{tag}, skipping...")
-                    continue
-
                 print(f"[🎥] Found {len(videos)} videos")
-                downloaded = 0
-
+                count = 0
                 for video in videos:
-                    if downloaded >= 5:
+                    if count >= 5:
                         break
                     video_url = video.get_attribute("src")
                     if video_url and ".mp4" in video_url:
@@ -76,10 +71,11 @@ def run_bot():
                         caption = generate_caption()
                         print(f"[✅] Saved: {filename}")
                         print(f"[📝] Caption: {caption}")
-                        downloaded += 1
-                        delay(3, 5)
+                        count += 1
+                        delay(2, 5)
             except Exception as e:
-                print(f"[❌] Error on #{tag}: {str(e)}")
+                print(f"[❌] Error on #{tag}: {e}")
+                delay(2, 4)
 
         context.close()
         browser.close()
