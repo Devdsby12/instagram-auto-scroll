@@ -55,7 +55,7 @@ def run_bot():
                 page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
                 delay(10, 15)
 
-                # 👇 This is the magic fix — wait for actual <video> tags, not hrefs!
+                # ✅ KEY FIX
                 page.wait_for_selector("video", timeout=30000)
                 videos = page.locator("video").all()
 
