@@ -71,6 +71,7 @@ links = page.locator("a[href*='/reel/']").all()
                     href = post.get_attribute("href")
                     if not href or "/reel/" not in href:
                         continue
+                   print("[DEBUG] Loading page:", f"https://www.instagram.com/explore/tags/{tag}/")
 
                     page.goto(f"https://www.instagram.com{href}", timeout=30000)
                     delay(5, 8)
