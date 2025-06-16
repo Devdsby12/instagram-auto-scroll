@@ -2,10 +2,12 @@ import os
 import time
 import random
 import requests
-from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
+from playwright.sync_api import sync_playwright
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import threading
 
-# Load environment variables
+# Load .env values
 load_dotenv()
 SESSION_ID = os.getenv("SESSION_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -18,30 +20,27 @@ def delay(min_sec=2, max_sec=5):
     time.sleep(random.uniform(min_sec, max_sec))
 
 def generate_caption():
-    prompt = "Write a funny, Instagram-style caption for a reel with dark humor or meme vibes in Hinglish. Include an Indian city name."
-    res = requests.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}",
-        headers={"Content-Type": "application/json"},
-        json={"contents": [{"parts": [{"text": prompt}]}]}
-    )
-    return res.json()['candidates'][0]['content']['parts'][0]['text']
+    prompt = "Write a funny Hinglish caption for Instagram meme/dark humor reel. Add random Indian city."
+    try:
+        res = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}",
+            headers={"Content-Type": "application/json"},
+            json={"contents": [{"parts": [{"text": prompt}]}]}
+        )
+        return res.json()['candidates'][0]['content']['parts'][0]['text']
+    except:
+        return "😂 Made in India 🇮🇳 #funny"
 
 def download_reel(video_url, filename):
     r = requests.get(video_url, stream=True)
     with open(filename, 'wb') as f:
-        for chunk in r.iter_content(chunk_size=1024):
-            if chunk:
-                f.write(chunk)
+        for chunk in r.iter_content(1024):
+            f.write(chunk)
 
 def run_bot():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            locale="en-US",
-            viewport={"width": 1280, "height": 800}
-        )
-
+        context = browser.new_context()
         context.add_cookies([{
             "name": "sessionid",
             "value": SESSION_ID,
@@ -51,67 +50,63 @@ def run_bot():
             "secure": True,
             "sameSite": "Lax"
         }])
-
         page = context.new_page()
 
         for tag in TAGS:
-            print(f"[🔥] Visiting #{tag}")
-            page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
-            delay(8, 12)
-
-            # Scroll to load more reels
-            for _ in range(5):
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
-                delay(3, 5)
-
             try:
+                print(f"[🔥] Visiting #{tag}")
+                page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
+                delay(8, 12)
+
                 page.wait_for_selector("a[href*='/reel/']", timeout=20000)
                 links = page.locator("a[href*='/reel/']").all()
-            except Exception as e:
-                print(f"[⚠️] No reels found on #{tag}: {e}")
-                continue
 
-            if len(links) == 0:
-                print(f"[⚠️] No posts found in #{tag}, trying next...")
-                continue
+                if len(links) == 0:
+                    print(f"[⚠️] No reels in #{tag}")
+                    continue
 
-            print(f"[📽️] Found {len(links)} posts")
-
-            downloaded = 0
-            for post in links:
-                if downloaded >= 15:
-                    break
-                try:
+                downloaded = 0
+                for post in links:
+                    if downloaded >= 10:
+                        break
                     href = post.get_attribute("href")
                     if not href or "/reel/" not in href:
                         continue
 
-                    print("[DEBUG] Loading page:", f"https://www.instagram.com{href}")
                     page.goto(f"https://www.instagram.com{href}", timeout=30000)
-                    delay(5, 8)
-
+                    delay(4, 7)
                     video = page.locator("video")
                     video_url = video.get_attribute("src")
-
                     if video_url:
                         filename = f"{DOWNLOAD_DIR}/reel_{random.randint(1000,9999)}.mp4"
                         download_reel(video_url, filename)
                         caption = generate_caption()
-                        print(f"[✅] Downloaded: {filename}")
+                        print(f"[✅] Saved {filename}")
                         print(f"[📝] Caption: {caption}")
                         downloaded += 1
+                    delay(4, 6)
 
-                    delay(4, 7)
+            except Exception as e:
+                print(f"[❌] Error with #{tag}: {str(e)}")
+                continue
 
-                except Exception as e:
-                    print(f"[❌] Error: {str(e)}")
-                    delay(3, 6)
-
-            break  # stop after first successful tag
-
-        context.close()
         browser.close()
 
+# 🔌 Dummy HTTP server to keep Render happy
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'Bot is running.\n')
+
+def start_server():
+    server = HTTPServer(('0.0.0.0', 10000), Handler)
+    print("✅ Server running on port 10000 to keep Render alive.")
+    server.serve_forever()
 
 if __name__ == "__main__":
+    thread = threading.Thread(target=start_server)
+    thread.start()
+
+    print("🚀 Starting Instagram bot...")
     run_bot()
