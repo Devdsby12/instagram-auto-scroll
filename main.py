@@ -47,45 +47,55 @@ def run_bot():
             "sameSite": "Lax"
         }])
         page = context.new_page()
-        tag = random.choice(TAGS)
-        print(f"[🔥] Visiting #{tag}")
-        page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
-        delay(5, 10)
 
-        links = page.locator("article a").all()
-        print(f"[📽️] Found {len(links)} posts")
+        for tag in TAGS:
+            print(f"[🔥] Visiting #{tag}")
+            page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
+            delay(8, 12)
 
-        downloaded = 0
-        for post in links:
-            if downloaded >= 15:
-                break
-            try:
-                href = post.get_attribute("href")
-                if not href or "/reel/" not in href:
-                    continue
+            page.wait_for_selector("article a", timeout=15000)
+            links = page.locator("article a").all()
 
-                page.goto(f"https://www.instagram.com{href}", timeout=30000)
-                delay(5, 8)
+            if len(links) == 0:
+                print(f"[⚠️] No posts found in #{tag}, trying next...")
+                continue
 
-                video = page.locator("video")
-                video_url = video.get_attribute("src")
+            print(f"[📽️] Found {len(links)} posts")
 
-                if video_url:
-                    filename = f"{DOWNLOAD_DIR}/reel_{random.randint(1000,9999)}.mp4"
-                    download_reel(video_url, filename)
-                    caption = generate_caption()
-                    print(f"[✅] Downloaded: {filename}")
-                    print(f"[📝] Caption: {caption}")
-                    downloaded += 1
+            downloaded = 0
+            for post in links:
+                if downloaded >= 15:
+                    break
+                try:
+                    href = post.get_attribute("href")
+                    if not href or "/reel/" not in href:
+                        continue
 
-                delay(4, 7)
+                    page.goto(f"https://www.instagram.com{href}", timeout=30000)
+                    delay(5, 8)
 
-            except Exception as e:
-                print(f"[❌] Error: {str(e)}")
-                delay(3, 6)
+                    video = page.locator("video")
+                    video_url = video.get_attribute("src")
+
+                    if video_url:
+                        filename = f"{DOWNLOAD_DIR}/reel_{random.randint(1000,9999)}.mp4"
+                        download_reel(video_url, filename)
+                        caption = generate_caption()
+                        print(f"[✅] Downloaded: {filename}")
+                        print(f"[📝] Caption: {caption}")
+                        downloaded += 1
+
+                    delay(4, 7)
+
+                except Exception as e:
+                    print(f"[❌] Error: {str(e)}")
+                    delay(3, 6)
+
+            break  # stop after first successful tag
 
         context.close()
         browser.close()
+
 
 if __name__ == "__main__":
     run_bot()
