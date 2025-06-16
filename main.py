@@ -1,39 +1,34 @@
 import os
-import random
 import time
-from playwright.sync_api import sync_playwright
+import random
 import requests
+from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
 
-# Load secrets
+# Load environment variables
 load_dotenv()
 SESSION_ID = os.getenv("SESSION_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Hashtags to search
-HASHTAGS = ["funny", "darkhumor", "meme", "comedy"]
-MIN_LIKES = 10000
-
-# Download folder
+TAGS = ["funny", "meme", "darkhumor", "comedy"]
 DOWNLOAD_DIR = "reels"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-def generate_caption(prompt="Write a funny caption for Instagram reel"):
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
-    headers = {"Content-Type": "application/json"}
-    params = {"key": GEMINI_API_KEY}
-    data = {
-        "contents": [{"parts": [{"text": prompt}]}]
-    }
-    try:
-        res = requests.post(url, headers=headers, params=params, json=data)
-        return res.json()['candidates'][0]['content']['parts'][0]['text']
-    except:
-        return "🔥 Must watch! #funny #memes"
+def delay(min_sec=2, max_sec=5):
+    time.sleep(random.uniform(min_sec, max_sec))
 
-def download_reel(video_url, output_path):
+def generate_caption():
+    prompt = "Write a funny, Instagram-style caption for a reel with dark humor or meme vibes in Hinglish. Include Indian city name."
+    res = requests.post(
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}",
+        headers={"Content-Type": "application/json"},
+        json={"contents": [{"parts": [{"text": prompt}]}]}
+    )
+    return res.json()['candidates'][0]['content']['parts'][0]['text']
+
+def download_reel(video_url, filename):
     r = requests.get(video_url, stream=True)
-    with open(output_path, 'wb') as f:
+    with open(filename, 'wb') as f:
         for chunk in r.iter_content(chunk_size=1024):
             if chunk:
                 f.write(chunk)
@@ -52,32 +47,44 @@ def run_bot():
             "sameSite": "Lax"
         }])
         page = context.new_page()
+        tag = random.choice(TAGS)
+        print(f"[🔥] Visiting #{tag}")
+        page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
+        delay(5, 10)
 
-        # Go to hashtag explore page
-        hashtag = random.choice(HASHTAGS)
-        page.goto(f"https://www.instagram.com/explore/tags/{hashtag}/")
-        page.wait_for_timeout(5000)
-        
-        # Click first reel
-        page.locator("article a").first.click()
-        time.sleep(2)
+        links = page.locator("article a").all()
+        print(f"[📽️] Found {len(links)} posts")
 
-        # Extract video URL
-        try:
-            video_url = page.locator("video").get_attribute("src")
-            if video_url:
-                filename = f"{DOWNLOAD_DIR}/{hashtag}_{random.randint(1000,9999)}.mp4"
-                download_reel(video_url, filename)
+        downloaded = 0
+        for post in links:
+            if downloaded >= 15:
+                break
+            try:
+                href = post.get_attribute("href")
+                if not href or "/reel/" not in href:
+                    continue
 
-                caption = generate_caption()
-                print("Downloaded:", filename)
-                print("Generated Caption:", caption)
+                page.goto(f"https://www.instagram.com{href}", timeout=30000)
+                delay(5, 8)
 
-                # TODO: Upload step here (separate function)
+                video = page.locator("video")
+                video_url = video.get_attribute("src")
 
-        except Exception as e:
-            print("Failed:", e)
+                if video_url:
+                    filename = f"{DOWNLOAD_DIR}/reel_{random.randint(1000,9999)}.mp4"
+                    download_reel(video_url, filename)
+                    caption = generate_caption()
+                    print(f"[✅] Downloaded: {filename}")
+                    print(f"[📝] Caption: {caption}")
+                    downloaded += 1
 
+                delay(4, 7)
+
+            except Exception as e:
+                print(f"[❌] Error: {str(e)}")
+                delay(3, 6)
+
+        context.close()
         browser.close()
 
 if __name__ == "__main__":
