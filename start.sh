@@ -1,3 +1,6 @@
 #!/bin/bash
-pip install -r requirements.txt
-python main.py
+# Install required browsers
+playwright install chromium
+
+# Run your bot
+python3 main.py
