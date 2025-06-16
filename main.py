@@ -53,8 +53,9 @@ def run_bot():
             page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
             delay(8, 12)
 
-            page.wait_for_selector("article a", timeout=15000)
-            links = page.locator("article a").all()
+           page.wait_for_selector("a[href*='/reel/']", timeout=20000)
+links = page.locator("a[href*='/reel/']").all()
+
 
             if len(links) == 0:
                 print(f"[⚠️] No posts found in #{tag}, trying next...")
