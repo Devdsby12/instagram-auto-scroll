@@ -3,18 +3,17 @@ import time
 import random
 import requests
 from playwright.sync_api import sync_playwright
+from dotenv import load_dotenv
 
-# Get secrets from environment (GitHub Actions secrets)
-SESSION_ID = os.getenv("INSTAGRAM_SESSION_ID")
+load_dotenv()
+SESSION_ID = os.getenv("SESSION_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+# ✅ Safety check for environment variables
 if not SESSION_ID or not GEMINI_API_KEY:
-    raise Exception("INSTAGRAM_SESSION_ID or GEMINI_API_KEY not found in environment.")
+    raise Exception("Error: SESSION_ID or GEMINI_API_KEY not found in environment.")
 
-# Hashtags to scrape
 TAGS = ["reelsinstagram", "indianfunny", "hindimemes", "comedy"]
-
-# Folder to save reels
 DOWNLOAD_DIR = "reels"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
@@ -54,21 +53,20 @@ def run_bot():
         }])
         page = context.new_page()
 
-        print("🚀 Starting Instagram bot...")
-
-        try:
-            page.goto("https://www.instagram.com/", timeout=60000)
-            page.wait_for_selector("nav", timeout=15000)
-            print("[✅] Logged in and homepage loaded")
-        except Exception as e:
-            print(f"[❌] Login failed: {e}")
-            return
+        page.goto("https://www.instagram.com/", timeout=60000)
+        page.wait_for_timeout(5000)
+        print("[✅] Logged in and homepage loaded")
 
         for tag in TAGS:
             print(f"[🔥] Visiting #{tag}")
             try:
                 page.goto(f"https://www.instagram.com/explore/tags/{tag}/", timeout=60000)
-                delay(10, 15)
+                delay(5, 8)
+
+                # 🔁 Scroll to load more reels
+                for _ in range(5):
+                    page.mouse.wheel(0, 1500)
+                    delay(2, 3)
 
                 page.wait_for_selector("video", timeout=30000)
                 videos = page.locator("video").all()
