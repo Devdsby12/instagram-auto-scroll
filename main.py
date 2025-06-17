@@ -1,7 +1,6 @@
 import os
 import asyncio
 import json
-import time
 from pathlib import Path
 
 from playwright.async_api import async_playwright
@@ -13,7 +12,7 @@ GEMINI_API_KEY = os.environ['GEMINI_API_KEY']
 REELS_DIR = Path('reels')
 REELS_DIR.mkdir(exist_ok=True)
 
-MAX_REELS_TO_DOWNLOAD = 5  # Number of reels to download per run
+MAX_REELS_TO_DOWNLOAD = 5
 
 def generate_caption(api_key, video_name):
     prompt = f"Write a funny Hinglish caption for this Instagram Reel video named {video_name}."
@@ -34,37 +33,24 @@ def generate_caption(api_key, video_name):
 
 async def scroll_and_collect_video_links(page, max_videos):
     video_links = set()
-    last_height = await page.evaluate("() => document.body.scrollHeight")
-    scroll_attempts = 0
-
-    while len(video_links) < max_videos and scroll_attempts < 10:
-        # Collect video src URLs on page
+    for _ in range(10):  # Try scrolling 10 times max
         videos = await page.query_selector_all("video")
         for video in videos:
             src = await video.get_attribute("src")
             if src and src not in video_links:
                 video_links.add(src)
                 if len(video_links) >= max_videos:
-                    break
-
-        # Scroll down to load more reels
+                    return list(video_links)
         await page.evaluate("window.scrollBy(0, window.innerHeight);")
-        await asyncio.sleep(3)  # wait for new content to load
-
-        new_height = await page.evaluate("() => document.body.scrollHeight")
-        if new_height == last_height:
-            scroll_attempts += 1
-        else:
-            scroll_attempts = 0
-            last_height = new_height
-
+        await asyncio.sleep(2)
     return list(video_links)
 
 async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context()
-
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+        )
         # Set Instagram sessionid cookie for login
         await context.add_cookies([{
             'name': 'sessionid',
@@ -78,13 +64,20 @@ async def main():
 
         page = await context.new_page()
         print("Opening Instagram Reels feed...")
-        await page.goto("https://www.instagram.com/reels/", wait_until="networkidle")
-
-        # Wait for reels videos to load
         try:
-            await page.wait_for_selector("video", timeout=15000)
-        except Exception:
-            print("No videos found on page. Check if sessionid is valid or Instagram layout changed.")
+            await page.goto("https://www.instagram.com/reels/", wait_until="domcontentloaded", timeout=40000)
+            await asyncio.sleep(5)  # Let page render
+            await page.screenshot(path="debug_reels.png")
+        except Exception as e:
+            print(f"Failed to open Reels page: {e}")
+            await page.screenshot(path="fail_reels.png")
+            await browser.close()
+            return
+
+        # Check if login is successful by looking for the Reels header or your profile icon
+        html = await page.content()
+        if "Log in" in html or "login" in html.lower():
+            print("❌ Not logged in! Check your INSTAGRAM_SESSION_ID.")
             await browser.close()
             return
 
@@ -101,10 +94,8 @@ async def main():
                 with open(filename, "wb") as f:
                     for chunk in resp.iter_content(chunk_size=8192):
                         f.write(chunk)
-
                 caption = generate_caption(GEMINI_API_KEY, filename.name)
                 print(f"Caption for {filename.name}: {caption}\n")
-
             except Exception as e:
                 print(f"Failed to download or generate caption for video {idx}: {e}")
 
@@ -113,5 +104,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
