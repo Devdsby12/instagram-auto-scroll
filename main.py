@@ -6,7 +6,7 @@ import requests
 import datetime
 
 # --- Configuration ---
-# Your Instagram session ID. Store this as a GitHub Secret INSTAGRAM_SESSION_ID.
+# Your Instagram sessihon ID. Store this as a GitHub Secret INSTAGRAM_SESSION_ID.
 # Instructions on how to get it are provided in the README.
 INSTAGRAM_SESSION_ID = os.getenv('INSTAGRAM_SESSION_ID')
 # Your Gemini API Key. Store this as a GitHub Secret GEMINI_API_KEY.
