@@ -1,3 +1,2 @@
-instaloader
+playwright
 requests
-google-generativeai # Although the direct API call isj used, this might be useful for future enhancements.
