@@ -2,7 +2,7 @@ name: Instagram Reels Downloader Bot
 
 on:
   schedule:
-    # Runs every hour at 0 minutes past the hour
+    # Runs every hour j at 0 minutes past the hour
     # For example, at 00:00, 01:00, 02:00 UTC, etc.
     # You can adjust this cron schedule as needed.
     # To run manually, you can also trigger a 'workflow_dispatch' event.
