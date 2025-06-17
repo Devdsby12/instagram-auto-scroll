@@ -1,0 +1,36 @@
+name: Instagram Reels Bot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * *'  # Runs daily at 4:00 AM UTC
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    env:
+      INSTAGRAM_SESSION_ID: ${{ secrets.INSTAGRAM_SESSION_ID }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install playwright requests
+          python -m playwright install chromium
+
+      - name: Run bot
+        run: python main.py
+
+      - name: Upload downloaded reels
+        uses: actions/upload-artifact@v4
+        with:
+          name: reels
+          path: reels/
