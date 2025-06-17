@@ -3,9 +3,9 @@ from pathlib import Path
 import requests
 from playwright.async_api import async_playwright
 
-# --- YOUR KEYS HERE ---
+# === PUT YOUR KEYS HERE ===
 INSTAGRAM_SESSION_ID = "73278141431:qCOvHoH8s2EZYt:28:AYeej0GNsgLxMwtp8XeecwndJ-75UG27VJZQeSIzfQ"
-GEMINI_API_KEY = "AIzaSyCQOK2bH9V3o0FRRWFqTt-y1vTz-YRCY1I"  # <-- put your Gemini API key here
+GEMINI_API_KEY = "AIzaSyCQOK2bH9V3o0FRRWFqTt-y1vTz-YRCY1I"  # <-- Replace with your Gemini API key
 
 REELS_DIR = Path('reels')
 REELS_DIR.mkdir(exist_ok=True)
@@ -30,7 +30,7 @@ def generate_caption(api_key, video_name):
 
 async def scroll_and_collect_video_links(page, max_videos):
     video_links = set()
-    for _ in range(10):  # Try scrolling 10 times max
+    for _ in range(12):  # Scroll up to 12 times
         videos = await page.query_selector_all("video")
         for video in videos:
             src = await video.get_attribute("src")
@@ -49,8 +49,9 @@ async def main():
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
         )
         page = await context.new_page()
-        print("Visiting Instagram home...")
+        print("Visiting Instagram home page...")
         await page.goto("https://www.instagram.com/", wait_until="domcontentloaded")
+        print("Setting sessionid cookie...")
         await context.add_cookies([{
             'name': 'sessionid',
             'value': INSTAGRAM_SESSION_ID,
