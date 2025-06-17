@@ -1,0 +1,32 @@
+name: Inst
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Install Playwright Browsers
+        run: python -m playwright install chromium
+      - name: Run Instagram Reels Downloader Bot
+        run: python main.py
+        env:
+          INSTAGRAM_SESSION_ID: ${{ secrets.INSTAGRAM_SESSION_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Upload reels folder
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reels
+          path: reels/
