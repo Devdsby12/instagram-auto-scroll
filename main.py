@@ -1,17 +1,14 @@
-import os
 import asyncio
-import json
 from pathlib import Path
-
-from playwright.async_api import async_playwright
 import requests
+from playwright.async_api import async_playwright
 
-INSTAGRAM_SESSION_ID = os.environ['INSTAGRAM_SESSION_ID']
-GEMINI_API_KEY = os.environ['GEMINI_API_KEY']
+# --- YOUR KEYS HERE ---
+INSTAGRAM_SESSION_ID = "73278141431:qCOvHoH8s2EZYt:28:AYeej0GNsgLxMwtp8XeecwndJ-75UG27VJZQeSIzfQ"
+GEMINI_API_KEY = "AIzaSyCQOK2bH9V3o0FRRWFqTt-y1vTz-YRCY1I"  # <-- put your Gemini API key here
 
 REELS_DIR = Path('reels')
 REELS_DIR.mkdir(exist_ok=True)
-
 MAX_REELS_TO_DOWNLOAD = 5
 
 def generate_caption(api_key, video_name):
@@ -51,33 +48,25 @@ async def main():
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
         )
-        # Set Instagram sessionid cookie for login
+        page = await context.new_page()
+        print("Visiting Instagram home...")
+        await page.goto("https://www.instagram.com/", wait_until="domcontentloaded")
         await context.add_cookies([{
             'name': 'sessionid',
             'value': INSTAGRAM_SESSION_ID,
             'domain': '.instagram.com',
             'path': '/',
             'httpOnly': True,
-            'secure': True,
-            'sameSite': 'Lax'
+            'secure': True
         }])
-
-        page = await context.new_page()
         print("Opening Instagram Reels feed...")
-        try:
-            await page.goto("https://www.instagram.com/reels/", wait_until="domcontentloaded", timeout=40000)
-            await asyncio.sleep(5)  # Let page render
-            await page.screenshot(path="debug_reels.png")
-        except Exception as e:
-            print(f"Failed to open Reels page: {e}")
-            await page.screenshot(path="fail_reels.png")
-            await browser.close()
-            return
+        await page.goto("https://www.instagram.com/reels/", wait_until="domcontentloaded", timeout=40000)
+        await asyncio.sleep(5)  # Let the page render
 
-        # Check if login is successful by looking for the Reels header or your profile icon
+        # Check if login worked
         html = await page.content()
         if "Log in" in html or "login" in html.lower():
-            print("❌ Not logged in! Check your INSTAGRAM_SESSION_ID.")
+            print("❌ Not logged in! Check your session id.")
             await browser.close()
             return
 
