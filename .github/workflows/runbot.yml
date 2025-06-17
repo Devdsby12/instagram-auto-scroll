@@ -1,22 +1,21 @@
-# .github/workflows/run_bot.yml
-name: Instagram Reels Bot
+name: Instagram Reel Bot
 
 on:
-  schedule:
-    - cron: '0 * * * *'  # Every hour at minute 0
+  workflow_dispatch:
   push:
     branches:
       - main
+  schedule:
+    - cron: '0 * * * *'
 
 jobs:
-  run_bot:
+  run-bot:
     runs-on: ubuntu-latest
     env:
-      INSTAGRAM_SESSION_ID: ${{ secrets.INSTAGRAM_SESSION_ID }}
+      INSTAGRAM_SESSION_ID: ${{ secrets.SESSION_ID }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-
     steps:
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -26,11 +25,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
           pip install -r requirements.txt
-          playwright install --with-deps
+          playwright install
 
-      - name: Run bot script
+      - name: Run Bot
         run: python main.py
-        # The INSTAGRAM_SESSION_ID and GEMINI_API_KEY are loaded from secrets
-        # Make sure these secrets are set in the repository settings
